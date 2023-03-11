@@ -1,26 +1,47 @@
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore'
 import React, { useState } from 'react'
-import { auth, db } from '../Firebase'
+import { auth, db, storage } from '../Firebase'
 import {GoSmiley} from 'react-icons/go'
+import {AiOutlinePaperClip} from 'react-icons/ai'
 import EmojiPicker, {Theme} from 'emoji-picker-react'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 const SendMessages = () => {
   
     const [message, setMessage] = useState('')
     const [emojiPicker, setEmojiPicker] = useState(false)
+    const [images, setImages] = useState(null)
     const sendMessage =  async (e) =>{
         e.preventDefault()
         if (message === ''){
             alert('Please type something..')
             return
         }
+        let imageUrl = null
+        if (images){
+            // upload images
+            try {
+                const storageRef = ref(storage, `images/${images.name}`)
+                await uploadBytes(storageRef, images).then(async(snapshot) =>{
+                    imageUrl = await getDownloadURL(snapshot.ref)
+                    console.log(imageUrl)
+                })
+            } catch (error) {
+                console.error("Error uploading image:", error);
+                alert("Error uploading image. Please try again.");
+                return;
+              }
+           
+        }
         const {uid, displayName} = auth.currentUser
         await addDoc(collection(db, 'messages'), {
             text:message,
             name:displayName,
             uid,
-            timestamp: serverTimestamp()
+            timestamp: serverTimestamp(),
+            image : imageUrl
         })
         setMessage('')
+        setImages(null)
         // console.log(scroll.current)
       
     }
@@ -30,6 +51,11 @@ const SendMessages = () => {
     const handleEmoji = (emojiObject) =>{
         setMessage(message + emojiObject.emoji)
         setEmojiPicker(false)
+    }
+
+    const handleImage = (e) =>{
+        
+        setImages(e.target.files[0])
     }
     // useEffect(() =>{
     //     if (scroll.current){
@@ -51,6 +77,8 @@ const SendMessages = () => {
                 </div>
                 
             <GoSmiley onClick={()=> setEmojiPicker(!emojiPicker)} size={30} className='cursor-pointer'/>
+            <label htmlFor="upload_image"><AiOutlinePaperClip size={30} /></label>
+            <input type="file" id='upload_image' onChange={handleImage} className='hidden' />
             <input type="text" value={message} onChange={handleChange} className='w-full outline-none bg-slate-900/10 py-3 px-4 rounded-l-xl placeholder:text-gray-900  text-sm font-bold' placeholder='Type Here..'/>
             </div>
            
